@@ -1,0 +1,12 @@
+
+body {
+    font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+}
+
+label.form-label {
+    font-weight: 500;
+}
+
+#studentId {
+    background-color: #e9ecef;
+}
