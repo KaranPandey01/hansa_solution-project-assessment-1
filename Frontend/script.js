@@ -136,9 +136,8 @@ function displayStudents(students) {
 
 // ---------- INSERT + UPDATE ----------
 form.addEventListener("submit", async function (event) {
-    event.preventDefault();   // stop normal HTML form submission
+    event.preventDefault();
 
-    // Property names match the Pydantic StudentCreate schema exactly
     const data = {
         FullName: fullName.value.trim(),
         DOB: dob.value,
@@ -161,6 +160,7 @@ form.addEventListener("submit", async function (event) {
     const isEditing = editingId !== null;
     const url = isEditing ? API_URL + "/students/" + editingId : API_URL + "/students";
 
+    submitButton.disabled = true;               // block double submits
     try {
         const response = await fetch(url, {
             method: isEditing ? "PUT" : "POST",
@@ -170,6 +170,7 @@ form.addEventListener("submit", async function (event) {
 
         if (!response.ok) {
             alert("Could not save the student:\n" + await readError(response));
+            await loadStudents();               // resync in case someone else changed data
             return;
         }
 
@@ -179,9 +180,10 @@ form.addEventListener("submit", async function (event) {
     } catch (error) {
         console.error(error);
         alert("Unable to connect to the backend. Make sure FastAPI is running on port 8001.");
+    } finally {
+        submitButton.disabled = false;          // always re-enable
     }
 });
-
 
 // ---------- EDIT ----------
 function startEdit(id) {
