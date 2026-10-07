@@ -2,7 +2,7 @@ from typing import List
 
 from fastapi import FastAPI, Depends, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from sqlalchemy import func, text, and_
+from sqlalchemy import func, and_
 from sqlalchemy.exc import SQLAlchemyError, IntegrityError
 from sqlalchemy.orm import Session
 
@@ -23,21 +23,11 @@ app.add_middleware(
 Base.metadata.create_all(bind=engine)
 
 
-# ---------- Helper 1: lock the table and return the highest ID ----------
-def lock_and_get_max_id(db: Session):
-    """Reads MAX(StudentID) while holding a lock until commit/rollback.
-    UPDLOCK + HOLDLOCK make other writers WAIT here, so two requests can
-    never read the same MAX at the same time."""
-    return db.execute(
-        text("SELECT MAX(StudentID) FROM Students WITH (UPDLOCK, HOLDLOCK)")
-    ).scalar()
-
-
-# ---------- Helper 2: duplicate detection ----------
+# ---------- Helper 1: duplicate detection (friendly pre-check) ----------
+# This gives a clear message in the normal case. The real guarantee is the
+# UNIQUE constraints in the database (see migrate_identity.sql), which also
+# catch two simultaneous requests that both pass this check.
 def find_duplicate(db: Session, data: StudentCreate, exclude_id: int = None):
-    """Return an error message if another student has the same details,
-    otherwise None. exclude_id lets a student be saved without clashing
-    with its own row (used by PUT)."""
     checks = [
         ("Email", func.lower(Student.Email) == data.Email.lower()),
         ("Phone", Student.Phone == data.Phone),
@@ -53,6 +43,22 @@ def find_duplicate(db: Session, data: StudentCreate, exclude_id: int = None):
         if existing:
             return f"A student with the same {label} already exists (ID {existing.StudentID})."
     return None
+
+
+# ---------- Helper 2: turn a constraint violation into a readable message ----------
+CONSTRAINT_MESSAGES = {
+    "UQ_Students_Email": "A student with the same Email already exists.",
+    "UQ_Students_Phone": "A student with the same Phone already exists.",
+    "UQ_Students_NameDOB": "A student with the same Full Name and Date of Birth already exists.",
+}
+
+
+def integrity_message(error: IntegrityError) -> str:
+    text_of_error = str(error.orig)
+    for name, message in CONSTRAINT_MESSAGES.items():
+        if name in text_of_error:
+            return message
+    return "Could not save: duplicate or conflicting data."
 
 
 @app.get("/")
@@ -72,25 +78,20 @@ def get_students(db: Session = Depends(get_db)):
 @app.post("/students", status_code=201)
 def create_student(data: StudentCreate, db: Session = Depends(get_db)):
     try:
-        # 1. Lock first, so the steps below cannot interleave with another request
-        max_id = lock_and_get_max_id(db)
-
-        # 2. Reject duplicates (checked while we hold the lock)
         problem = find_duplicate(db, data)
         if problem:
-            db.rollback()                      # release the lock immediately
             raise HTTPException(status_code=409, detail=problem)
 
-        # 3. Safe to generate the ID and insert
-        next_id = (max_id + 1) if max_id is not None else 101
-        student = Student(StudentID=next_id, **data.model_dump())
+        # No StudentID here: SQL Server generates it atomically (IDENTITY)
+        student = Student(**data.model_dump())
         db.add(student)
-        db.commit()                            # lock released here
-        return {"message": "Student registered successfully", "StudentID": next_id}
+        db.commit()
+        db.refresh(student)                    # loads the generated StudentID
+        return {"message": "Student registered successfully", "StudentID": student.StudentID}
 
     except IntegrityError as error:
         db.rollback()
-        raise HTTPException(status_code=409, detail="Could not save: duplicate or conflicting data.")
+        raise HTTPException(status_code=409, detail=integrity_message(error))
     except SQLAlchemyError as error:
         db.rollback()
         raise HTTPException(status_code=500, detail=str(error))
@@ -100,17 +101,13 @@ def create_student(data: StudentCreate, db: Session = Depends(get_db)):
 @app.put("/students/{student_id}", response_model=StudentOut)
 def update_student(student_id: int, data: StudentCreate, db: Session = Depends(get_db)):
     try:
-        lock_and_get_max_id(db)                # same lock: serialises writes
-
         student = db.get(Student, student_id)
         if student is None:
-            db.rollback()
             raise HTTPException(status_code=404, detail="Student not found")
 
         # Ignore this student's own row when looking for duplicates
         problem = find_duplicate(db, data, exclude_id=student_id)
         if problem:
-            db.rollback()
             raise HTTPException(status_code=409, detail=problem)
 
         for field, value in data.model_dump().items():
@@ -120,9 +117,9 @@ def update_student(student_id: int, data: StudentCreate, db: Session = Depends(g
         db.refresh(student)
         return student
 
-    except IntegrityError:
+    except IntegrityError as error:
         db.rollback()
-        raise HTTPException(status_code=409, detail="Could not save: duplicate or conflicting data.")
+        raise HTTPException(status_code=409, detail=integrity_message(error))
     except SQLAlchemyError as error:
         db.rollback()
         raise HTTPException(status_code=500, detail=str(error))

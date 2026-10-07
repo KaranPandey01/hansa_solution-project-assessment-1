@@ -3,12 +3,12 @@ from database import Base
 
 
 class Student(Base):
-    """Maps to the existing SQL Server table 'Students'."""
+    """Maps to the SQL Server table 'Students'."""
     __tablename__ = "Students"
 
-    # StudentID is NOT an IDENTITY column in the existing database,
-    # so the backend assigns it manually (see create_student in main.py).
-    StudentID = Column(Integer, primary_key=True, autoincrement=False)
+    # StudentID is an IDENTITY column: SQL Server generates it atomically on
+    # INSERT, so the backend never assigns it (see create_student in main.py).
+    StudentID = Column(Integer, primary_key=True, autoincrement=True)
     FullName = Column(String)
     DOB = Column(Date)
     Gender = Column(String)
