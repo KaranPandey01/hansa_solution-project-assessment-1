@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 from database import engine, Base, get_db
 from models import Student
 from schemas import StudentCreate, StudentOut
+from academics import router as academics_router, enroll_default_subjects  # subjects, hostel, marks, details search
 
 app = FastAPI(title="Student Admission System")
 
@@ -21,6 +22,8 @@ app.add_middleware(
 )
 
 Base.metadata.create_all(bind=engine)
+
+app.include_router(academics_router)  # adds the new endpoints from academics.py
 
 
 # ---------- Helper 1: duplicate detection (friendly pre-check) ----------
@@ -85,7 +88,9 @@ def create_student(data: StudentCreate, db: Session = Depends(get_db)):
         # No StudentID here: SQL Server generates it atomically (IDENTITY)
         student = Student(**data.model_dump())
         db.add(student)
-        db.commit()
+        db.flush()                             # runs the INSERT now: SQL Server generates StudentID (still inside the transaction)
+        enroll_default_subjects(db, student.StudentID)   # new student gets the default subjects
+        db.commit()                            # student + default subjects saved together, or neither
         db.refresh(student)                    # loads the generated StudentID
         return {"message": "Student registered successfully", "StudentID": student.StudentID}
 

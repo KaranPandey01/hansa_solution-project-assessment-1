@@ -136,8 +136,76 @@
             </div>
         </div>
 
+        <!-- ================= Student Details: subjects, hostel, marks ================= -->
+        <div class="card mt-4" id="detailsCard">
+            <div class="card-header bg-success text-white">
+                <h5 class="mb-0">Student Details: Subjects, Hostel &amp; Marks</h5>
+            </div>
+            <div class="card-body">
+
+                <!-- Search by ID (or click "Details" on a row in the table above) -->
+                <div class="input-group mb-3">
+                    <input type="number" class="form-control" id="detailsSearchId"
+                           placeholder="Enter Student ID, or click Details in the table">
+                    <button class="btn btn-success" type="button" id="detailsSearchBtn">Show Details</button>
+                </div>
+
+                <!-- Add to the master lists -->
+                <details class="mb-3">
+                    <summary>Add a new subject or hostel to the lists</summary>
+                    <div class="row g-2 mt-1">
+                        <div class="col-md-6 input-group">
+                            <input id="newSubject" class="form-control" placeholder="New subject name">
+                            <button id="addSubjectBtn" class="btn btn-outline-secondary" type="button">Add subject</button>
+                        </div>
+                        <div class="col-md-6 input-group">
+                            <input id="newHostel" class="form-control" placeholder="New hostel name">
+                            <button id="addHostelBtn" class="btn btn-outline-secondary" type="button">Add hostel</button>
+                        </div>
+                    </div>
+                </details>
+
+                <!-- Filled in when a student is selected -->
+                <div id="detailsResult" class="d-none">
+
+                    <h6 class="border-bottom pb-1">Profile</h6>
+                    <dl id="detailsProfile" class="row mb-4"></dl>
+
+                    <h6 class="border-bottom pb-1">Hostel (one hostel, room and bed per student)</h6>
+                    <p id="hostelText" class="mb-2"></p>
+                    <div class="row g-2 mb-4">
+                        <div class="col-md-4"><select id="hostelSelect" class="form-select"></select></div>
+                        <div class="col-md-3"><input id="roomNo" class="form-control" placeholder="Room no"></div>
+                        <div class="col-md-3"><input id="bedNo" type="number" min="1" class="form-control" placeholder="Bed no"></div>
+                        <div class="col-md-2"><button id="allocateBtn" class="btn btn-success w-100" type="button">Save</button></div>
+                    </div>
+
+                    <h6 class="border-bottom pb-1">Subjects</h6>
+                    <div id="subjectList" class="mb-2"></div>
+                    <div class="row g-2 mb-4">
+                        <div class="col-md-10"><select id="subjectSelect" class="form-select"></select></div>
+                        <div class="col-md-2"><button id="addStudentSubjectBtn" class="btn btn-success w-100" type="button">Add</button></div>
+                    </div>
+
+                    <h6 class="border-bottom pb-1">Marks</h6>
+                    <table class="table table-sm">
+                        <thead><tr><th>Subject</th><th>Marks</th><th>Year</th><th>Result</th></tr></thead>
+                        <tbody id="marksBody"></tbody>
+                    </table>
+                    <div class="row g-2">
+                        <div class="col-md-4"><select id="markSubject" class="form-select"></select></div>
+                        <div class="col-md-3"><input id="markValue" type="number" min="0" max="100" step="0.01" class="form-control" placeholder="Marks (0-100)"></div>
+                        <div class="col-md-3"><input id="markYear" type="number" class="form-control" placeholder="Year"></div>
+                        <div class="col-md-2"><button id="addMarkBtn" class="btn btn-success w-100" type="button">Save</button></div>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+
     </div>
 
     <script src="script.js"></script>
+    <script src="details.js"></script>
 </body>
 </html>
